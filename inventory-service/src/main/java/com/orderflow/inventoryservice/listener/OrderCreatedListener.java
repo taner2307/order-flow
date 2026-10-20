@@ -36,6 +36,7 @@ public class OrderCreatedListener {
         }else {
             InventoryReservedEvent reservedEvent = new InventoryReservedEvent(
                     event.orderId(),
+                    event.totalAmount(),
                     LocalDateTime.now()
             );
             kafkaTemplate.send("inventory.reserved", event.orderId().toString(), reservedEvent);

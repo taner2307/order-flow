@@ -29,9 +29,10 @@ public class OrderService {
                 .toList();
 
         Order order = Order.create(request.customerId(), items);
+        order.markPaymentPending();
+        log.info("Status after markPaymentPending: {}", order.getStatus());
 
         Order savedOrder = orderRepository.save(order);
-
         publishEvent(savedOrder);
         return savedOrder;
     }
