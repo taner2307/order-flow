@@ -55,7 +55,7 @@ public class InventoryReservedListener {
         } else {
             payment.markFailed();
             eventType = "PaymentFailed";
-            eventPayload = new PaymentFailedEvent(event.orderId(), "Amount exceeds limit", LocalDateTime.now()).toString();
+            eventPayload = new PaymentFailedEvent(event.orderId(), "Amount exceeds limit", LocalDateTime.now());
         }
         paymentRepository.save(payment);
 

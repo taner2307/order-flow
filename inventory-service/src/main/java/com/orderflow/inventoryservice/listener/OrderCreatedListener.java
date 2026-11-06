@@ -47,7 +47,7 @@ public class OrderCreatedListener {
                     event.orderId(),
                     "Product PROD-999 is out of stock",
                     LocalDateTime.now()
-            ).toString();
+            );
         }else {
             reservation.markReserved();
             eventType = "InventoryReserved";

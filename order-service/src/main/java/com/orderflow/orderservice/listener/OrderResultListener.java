@@ -20,21 +20,33 @@ public class OrderResultListener {
 
     private final OrderRepository orderRepository;
 
-    @KafkaListener(topics = "payment.completed", groupId = "order-service")
+    @KafkaListener(topics = "payment.completed", groupId = "order-service",
+            properties = {
+                    "spring.json.value.default.type=com.orderflow.common.event.PaymentCompletedEvent",
+                    "spring.json.use.type.headers=false"
+            })
     @Transactional
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
         log.info("Received PaymentCompleted for order {}", event.orderId());
         updateOrder(event.orderId(), Order::markPaid);
     }
 
-    @KafkaListener(topics = "payment.failed", groupId = "order-service")
+    @KafkaListener(topics = "payment.failed", groupId = "order-service",
+            properties = {
+                    "spring.json.value.default.type=com.orderflow.common.event.PaymentFailedEvent",
+                    "spring.json.use.type.headers=false"
+            })
     @Transactional
     public void handlePaymentFailed(PaymentFailedEvent event) {
         log.info("Received PaymentFailed for order {}", event.orderId());
         updateOrder(event.orderId(), order -> order.markFailed(event.reason()));
     }
 
-    @KafkaListener(topics = "inventory.reservation-failed", groupId = "order-service")
+    @KafkaListener(topics = "inventory.reservation-failed", groupId = "order-service",
+            properties = {
+                    "spring.json.value.default.type=com.orderflow.common.event.InventoryReservationFailedEvent",
+                    "spring.json.use.type.headers=false"
+            })
     @Transactional
     public void handleInventoryFailed(InventoryReservationFailedEvent event) {
         log.info("Received InventoryReservationFailed for order {}", event.orderId());
