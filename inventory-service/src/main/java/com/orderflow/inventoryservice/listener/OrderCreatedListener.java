@@ -7,8 +7,10 @@ import com.orderflow.common.event.InventoryReservationFailedEvent;
 import com.orderflow.common.event.InventoryReservedEvent;
 import com.orderflow.common.event.OrderCreatedEvent;
 import com.orderflow.inventoryservice.entity.OutboxEvent;
+import com.orderflow.inventoryservice.entity.ProcessedEvent;
 import com.orderflow.inventoryservice.entity.Reservation;
 import com.orderflow.inventoryservice.repository.OutboxEventRepository;
+import com.orderflow.inventoryservice.repository.ProcessedEventRepository;
 import com.orderflow.inventoryservice.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,10 +28,17 @@ public class OrderCreatedListener {
     private final ObjectMapper objectMapper;
     private final ReservationRepository reservationRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final ProcessedEventRepository processedEventRepository;
 
     @KafkaListener(topics = "order.created", groupId = "inventory-service")
     public void handle(OrderCreatedEvent event) {
         log.info("Processing inventory reservation for order: {}", event.orderId());
+
+        String eventId = event.orderId().toString();
+        if (processedEventRepository.existsById(eventId)) {
+            log.info("OrderCreated already processed: {}", eventId);
+            return;
+        }
 
         Reservation reservation = Reservation.create(event.orderId());
         reservationRepository.save(reservation);
@@ -67,6 +76,7 @@ public class OrderCreatedListener {
         );
 
         outboxEventRepository.save(outboxEvent);
+        processedEventRepository.save(ProcessedEvent.of(eventId));
         log.info("Reservation and OutboxEvent saved for order {}", event.orderId());
     }
 

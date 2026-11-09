@@ -1,8 +1,10 @@
 package com.orderflow.orderservice.service;
 
 import com.orderflow.orderservice.dto.CreateOrderRequest;
+import com.orderflow.orderservice.entity.IdempotencyKey;
 import com.orderflow.orderservice.entity.Order;
 import com.orderflow.orderservice.entity.OrderItem;
+import com.orderflow.orderservice.repository.IdempotencyKeyRepository;
 import com.orderflow.orderservice.repository.OrderRepository;
 import com.orderflow.common.event.OrderCreatedEvent;
 import lombok.RequiredArgsConstructor;
@@ -19,10 +21,20 @@ import java.util.List;
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final IdempotencyKeyRepository idempotencyKeyRepository;
     private final KafkaTemplate<String, OrderCreatedEvent> kafkaTemplate;
 
     @Transactional
-    public Order createOrder(CreateOrderRequest request) {
+    public Order createOrder(CreateOrderRequest request, String idempotencyKey) {
+
+        if(idempotencyKey != null) {
+            var existing = idempotencyKeyRepository.findById(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Idempotency key already used: {}", idempotencyKey);
+                return orderRepository.findById(existing.get().getOrderId())
+                        .orElseThrow(() -> new IllegalStateException("Order not found for key"));
+            }
+        }
 
         List<OrderItem> items = request.items().stream()
                 .map(i -> OrderItem.create(i.productId(), i.quantity(), i.unitPrice()))
@@ -33,6 +45,12 @@ public class OrderService {
         log.info("Status after markPaymentPending: {}", order.getStatus());
 
         Order savedOrder = orderRepository.save(order);
+
+        if (idempotencyKey != null) {
+            IdempotencyKey keyEntity = IdempotencyKey.create(idempotencyKey, savedOrder.getId());
+            idempotencyKeyRepository.save(keyEntity);
+        }
+
         publishEvent(savedOrder);
         return savedOrder;
     }

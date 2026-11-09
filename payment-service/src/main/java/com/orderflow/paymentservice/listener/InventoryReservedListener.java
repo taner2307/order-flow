@@ -8,9 +8,11 @@ import com.orderflow.common.event.InventoryReservedEvent;
 import com.orderflow.common.event.PaymentCompletedEvent;
 import com.orderflow.common.event.PaymentFailedEvent;
 import com.orderflow.paymentservice.entity.OutboxEvent;
+import com.orderflow.paymentservice.entity.ProcessedEvent;
 import com.orderflow.paymentservice.repository.OutboxEventRepository;
 import com.orderflow.paymentservice.repository.PaymentRepository;
 import com.orderflow.paymentservice.entity.Payment;
+import com.orderflow.paymentservice.repository.ProcessedEventRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -26,6 +28,7 @@ public class InventoryReservedListener {
 
     private final PaymentRepository paymentRepository;
     private final OutboxEventRepository outboxEventRepository;
+    private final ProcessedEventRepository processedEventRepository;
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "inventory.reserved", groupId = "payment-service",properties = {
@@ -35,6 +38,13 @@ public class InventoryReservedListener {
     public void handle(InventoryReservedEvent event) {
         log.info("Starting payment for order {} with amount {}",
                 event.orderId(), event.totalAmount());
+
+        String eventId = event.orderId().toString();
+
+        if (processedEventRepository.existsById(eventId)) {
+            log.info("InventoryReserved already processed: {}", eventId);
+            return;
+        }
 
         Payment payment = Payment.create(event.orderId(), event.totalAmount());
         paymentRepository.save(payment);
@@ -67,6 +77,7 @@ public class InventoryReservedListener {
         );
 
         outboxEventRepository.save(outboxEvent);
+        processedEventRepository.save(ProcessedEvent.of(eventId));
         log.info("Payment and OutboxEvent saved for order {}", event.orderId());
     }
 
