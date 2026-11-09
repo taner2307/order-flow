@@ -46,4 +46,11 @@ public class Reservation {
         }
         this.status = ReservationStatus.FAILED;
     }
+
+    public void markReleased() {
+        if (this.status != ReservationStatus.RESERVED) {
+            throw new IllegalStateException("Only RESERVED reservation can be released");
+        }
+        this.status = ReservationStatus.RELEASED;
+    }
 }
