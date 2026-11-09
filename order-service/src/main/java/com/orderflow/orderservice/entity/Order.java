@@ -33,6 +33,9 @@ public class Order {
 
     private LocalDateTime createdAt;
 
+    private boolean inventoryReserved = false;
+    private boolean paymentCompleted = false;
+
     public static Order create(String customerId, List<OrderItem> items) {
         if(customerId == null || customerId.isEmpty()) {
             throw new IllegalArgumentException("Customer ID cannot be null or empty");
@@ -72,11 +75,15 @@ public class Order {
     }
 
     public void markPaid() {
-        if (this.status != OrderStatus.PAYMENT_PENDING) {
-            throw new IllegalStateException(
-                    "Only PAYMENT_PENDING orders can be marked as PAID. Current: " + status);
-        }
+        this.paymentCompleted = true;
         this.status = OrderStatus.PAID;
+        tryComplete();
+    }
+
+    private void tryComplete() {
+        if (inventoryReserved && paymentCompleted && this.status != OrderStatus.COMPLETED) {
+            this.status = OrderStatus.COMPLETED;
+        }
     }
 
     public void markFailed(String reason) {
@@ -88,5 +95,17 @@ public class Order {
             throw new IllegalStateException("Completed order cannot be cancelled");
         }
         this.status = OrderStatus.CANCELLED;
+    }
+
+    public void markInventoryReserved() {
+        this.inventoryReserved = true;
+        tryComplete();
+    }
+
+    public void markCompleted() {
+        if (this.status != OrderStatus.PAID) {
+            throw new IllegalStateException("Only PAID orders can be completed");
+        }
+        this.status = OrderStatus.COMPLETED;
     }
 }

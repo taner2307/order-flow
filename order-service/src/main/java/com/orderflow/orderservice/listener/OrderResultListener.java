@@ -1,5 +1,6 @@
 package com.orderflow.orderservice.listener;
 
+import com.orderflow.common.event.InventoryReservedEvent;
 import com.orderflow.common.event.PaymentCompletedEvent;
 import com.orderflow.common.event.PaymentFailedEvent;
 import com.orderflow.common.event.InventoryReservationFailedEvent;
@@ -28,7 +29,10 @@ public class OrderResultListener {
     @Transactional
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
         log.info("Received PaymentCompleted for order {}", event.orderId());
-        updateOrder(event.orderId(), Order::markPaid);
+        updateOrder(event.orderId(), order -> {
+            order.markPaid();
+            // İleride burada "her şey tamam mı?" kontrolü yapıp COMPLETED yapabiliriz
+        });
     }
 
     @KafkaListener(topics = "payment.failed", groupId = "order-service",
@@ -40,6 +44,20 @@ public class OrderResultListener {
     public void handlePaymentFailed(PaymentFailedEvent event) {
         log.info("Received PaymentFailed for order {}", event.orderId());
         updateOrder(event.orderId(), order -> order.markFailed(event.reason()));
+    }
+
+    @KafkaListener(
+            topics = "inventory.reserved",
+            groupId = "order-service",
+            properties = {
+                    "spring.json.value.default.type=com.orderflow.common.event.InventoryReservedEvent",
+                    "spring.json.use.type.headers=false"
+            }
+    )
+    @Transactional
+    public void handleInventoryReserved(InventoryReservedEvent event) {
+        log.info("Inventory reserved for order {}", event.orderId());
+        updateOrder(event.orderId(), Order::markInventoryReserved);
     }
 
     @KafkaListener(topics = "inventory.reservation-failed", groupId = "order-service",
