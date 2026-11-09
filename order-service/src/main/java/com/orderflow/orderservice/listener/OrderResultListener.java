@@ -33,15 +33,21 @@ public class OrderResultListener {
     public void handlePaymentCompleted(PaymentCompletedEvent event) {
         log.info("Received PaymentCompleted for order {}", event.orderId());
         String eventId = "payment-completed-" + event.orderId();
+        log.info("Checking eventId: {}", eventId);
+        boolean exists = processedEventRepository.existsById(eventId);
+        log.info("Exists? {}", exists);
 
-        if (processedEventRepository.existsById(eventId)) {
-            log.info("PaymentCompleted already processed: {}", eventId);
+        if (exists) {
+            log.info("Already processed, skipping");
             return;
         }
+
+        log.info("Processing new PaymentCompleted");
         updateOrder(event.orderId(), order -> {
             order.markPaid();
         });
         processedEventRepository.save(ProcessedEvent.of(eventId));
+        log.info("Saved processed event");
     }
 
     @KafkaListener(topics = "payment.failed", groupId = "order-service",
@@ -52,7 +58,7 @@ public class OrderResultListener {
     @Transactional
     public void handlePaymentFailed(PaymentFailedEvent event) {
         log.info("Received PaymentFailed for order {}", event.orderId());
-        String eventId = "payment-completed-" + event.orderId();
+        String eventId = "payment-failed-" + event.orderId();
 
         if (processedEventRepository.existsById(eventId)) {
             log.info("PaymentCompleted already processed: {}", eventId);
@@ -74,7 +80,7 @@ public class OrderResultListener {
     @Transactional
     public void handleInventoryReserved(InventoryReservedEvent event) {
         log.info("Inventory reserved for order {}", event.orderId());
-        String eventId = "payment-completed-" + event.orderId();
+        String eventId = "inventory-reserved-" + event.orderId();
 
         if (processedEventRepository.existsById(eventId)) {
             log.info("PaymentCompleted already processed: {}", eventId);
@@ -93,7 +99,7 @@ public class OrderResultListener {
     @Transactional
     public void handleInventoryFailed(InventoryReservationFailedEvent event) {
         log.info("Received InventoryReservationFailed for order {}", event.orderId());
-        String eventId = "payment-completed-" + event.orderId();
+        String eventId = "inventory-failed-" + event.orderId();
 
         if (processedEventRepository.existsById(eventId)) {
             log.info("PaymentCompleted already processed: {}", eventId);

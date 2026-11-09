@@ -15,6 +15,7 @@ public record OrderCreatedEvent(
         List<OrderItemDto> items,
         LocalDateTime createdAt
 ) {
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record OrderItemDto(
             String productId,
             Integer quantity,
