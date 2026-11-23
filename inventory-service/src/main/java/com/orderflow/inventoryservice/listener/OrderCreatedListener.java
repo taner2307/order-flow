@@ -9,6 +9,7 @@ import com.orderflow.common.event.OrderCreatedEvent;
 import com.orderflow.inventoryservice.entity.OutboxEvent;
 import com.orderflow.inventoryservice.entity.ProcessedEvent;
 import com.orderflow.inventoryservice.entity.Reservation;
+import com.orderflow.inventoryservice.lock.RedisLockService;
 import com.orderflow.inventoryservice.repository.OutboxEventRepository;
 import com.orderflow.inventoryservice.repository.ProcessedEventRepository;
 import com.orderflow.inventoryservice.repository.ReservationRepository;
@@ -18,6 +19,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -29,10 +31,19 @@ public class OrderCreatedListener {
     private final ReservationRepository reservationRepository;
     private final OutboxEventRepository outboxEventRepository;
     private final ProcessedEventRepository processedEventRepository;
+    private final RedisLockService redisLockService;
 
     @KafkaListener(topics = "order.created", groupId = "inventory-service")
     public void handle(OrderCreatedEvent event) {
         log.info("Processing inventory reservation for order: {}", event.orderId());
+        String lockKey = "lock:reservation:" + event.orderId();
+
+        boolean locked = redisLockService.tryLock(lockKey, Duration.ofSeconds(10));
+        if (!locked) {
+            log.warn("Could not acquire lock for order {}, skipping", event.orderId());
+            return;
+        }
+
 
         String eventId = event.orderId().toString();
         if (processedEventRepository.existsById(eventId)) {
@@ -78,6 +89,8 @@ public class OrderCreatedListener {
         outboxEventRepository.save(outboxEvent);
         processedEventRepository.save(ProcessedEvent.of(eventId));
         log.info("Reservation and OutboxEvent saved for order {}", event.orderId());
+
+        redisLockService.unlock(lockKey);
     }
 
     private String toJson(Object obj) {

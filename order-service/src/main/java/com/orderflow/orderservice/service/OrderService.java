@@ -1,6 +1,7 @@
 package com.orderflow.orderservice.service;
 
 import com.orderflow.orderservice.dto.CreateOrderRequest;
+import com.orderflow.orderservice.dto.OrderResponse;
 import com.orderflow.orderservice.entity.IdempotencyKey;
 import com.orderflow.orderservice.entity.Order;
 import com.orderflow.orderservice.entity.OrderItem;
@@ -9,11 +10,13 @@ import com.orderflow.orderservice.repository.OrderRepository;
 import com.orderflow.common.event.OrderCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +56,14 @@ public class OrderService {
 
         publishEvent(savedOrder);
         return savedOrder;
+    }
+
+    @Cacheable(value = "orders", key = "#p0")
+    public OrderResponse findById(UUID id) {
+        log.info("Fetching order from DB: {}", id);
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        return OrderResponse.from(order);
     }
 
     private void publishEvent(Order order) {
