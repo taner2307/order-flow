@@ -47,10 +47,11 @@ public class OutboxPublisher {
         }
     }
 
+    // Örnek mapping
     private String resolveTopic(String eventType) {
         return switch (eventType) {
-            case "InventoryReserved" -> "inventory.reserved";
-            case "InventoryReservationFailed" -> "inventory.reservation-failed";
+            case "InventoryReserved", "InventoryReservedEvent" -> "inventory.reserved";
+            case "InventoryReservationFailedEvent" -> "inventory.reservation-failed";
             default -> throw new IllegalArgumentException("Unknown event type: " + eventType);
         };
     }

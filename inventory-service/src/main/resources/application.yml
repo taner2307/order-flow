@@ -44,3 +44,22 @@ management:
     web:
       exposure:
         include: health,info
+
+resilience4j:
+  retry:
+    retryAspectOrder: 2
+    instances:
+      inventoryReservation:
+        max-attempts: 3
+        wait-duration: 1s
+        retry-exceptions:
+          - java.lang.RuntimeException
+  circuitbreaker:
+    circuitBreakerAspectOrder: 1
+    instances:
+      inventoryReservation:
+        sliding-window-size: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 2
+        minimum-number-of-calls: 3

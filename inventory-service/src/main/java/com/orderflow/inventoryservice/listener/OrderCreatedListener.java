@@ -13,6 +13,8 @@ import com.orderflow.inventoryservice.lock.RedisLockService;
 import com.orderflow.inventoryservice.repository.OutboxEventRepository;
 import com.orderflow.inventoryservice.repository.ProcessedEventRepository;
 import com.orderflow.inventoryservice.repository.ReservationRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -34,6 +36,8 @@ public class OrderCreatedListener {
     private final RedisLockService redisLockService;
 
     @KafkaListener(topics = "order.created", groupId = "inventory-service")
+    @CircuitBreaker(name = "inventoryReservation", fallbackMethod = "handleFallback")
+    @Retry(name = "inventoryReservation")
     public void handle(OrderCreatedEvent event) {
         log.info("Processing inventory reservation for order: {}", event.orderId());
         String lockKey = "lock:reservation:" + event.orderId();
@@ -43,7 +47,6 @@ public class OrderCreatedListener {
             log.warn("Could not acquire lock for order {}, skipping", event.orderId());
             return;
         }
-
 
         String eventId = event.orderId().toString();
         if (processedEventRepository.existsById(eventId)) {
@@ -102,5 +105,26 @@ public class OrderCreatedListener {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void handleFallback(OrderCreatedEvent event, Exception e) {
+        log.error("Circuit Breaker OPEN or failure for order {}: {}", event.orderId(), e.getMessage());
+
+        // Failed event üret
+        InventoryReservationFailedEvent failedEvent = new InventoryReservationFailedEvent(
+                event.orderId(),
+                "Inventory service unavailable - circuit breaker open",
+                LocalDateTime.now()
+        );
+
+        OutboxEvent outboxEvent = OutboxEvent.create(
+                "Reservation",
+                event.orderId().toString(),
+                "InventoryReservationFailedEvent",
+                toJson(failedEvent)
+        );
+        outboxEventRepository.save(outboxEvent);
+
+        log.info("InventoryReservationFailedEvent written to outbox for order {}", event.orderId());
     }
 }
